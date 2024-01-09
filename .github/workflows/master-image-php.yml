@@ -58,20 +58,3 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-latest-tag.outputs.tag }}
           labels: ${{ steps.meta.outputs.labels }}
-
-      - name: generate Json
-        id: webhook-data
-        run: |
-          echo "JSON_STRING=$(jq -nc \
-            --arg tag ${{ steps.get-latest-tag.outputs.tag }} \
-            --arg image ${{ env.IMAGE_NAME }} \
-            --arg registry ${{ env.REGISTRY }} \
-            '{"tag": $tag, "image": $image, "registry": $registry}')" >> $GITHUB_OUTPUT
-
-      - name: Call deployment webhook
-        uses: distributhor/workflow-webhook@v2
-        env:
-          verbose: true
-          webhook_url: ${{ secrets.WEBHOOK_URL }}
-          webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
-          data: ${{ steps.webhook-data.outputs.JSON_STRING }}

@@ -1,23 +1,10 @@
-FROM php:8.1-fpm-alpine AS composer-build
-
-WORKDIR /var/www/html
-COPY src /var/www/html
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-RUN composer install  \
-    --ignore-platform-reqs \
-    --no-ansi \
-    --no-dev \
-    --no-autoloader \
-    --no-interaction \
-    --no-scripts
-
-FROM node:16 AS assets-build
+FROM node:18 AS assets-build
 
 WORKDIR /src
 COPY src /src/
-COPY --from=composer-build /var/www/html/vendor /src/vendor
-RUN npm ci
-RUN npm run build
+
+RUN npm install
+RUN npm run prod
 
 FROM nginx:stable-alpine
 
