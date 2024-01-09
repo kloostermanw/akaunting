@@ -1,0 +1,46 @@
+
+FROM php:8.1-fpm-alpine
+
+ARG PHPGROUP
+ARG PHPUSER
+ARG APP_VERSION
+ARG GITHUB_RUN_NUMBER
+ARG GITHUB_RUN_ID
+
+ENV APP_VERSION=${APP_VERSION}
+ENV PHPGROUP=${PHPGROUP}
+ENV PHPUSER=${PHPUSER}
+ENV GITHUB_RUN_NUMBER=${GITHUB_RUN_NUMBER}
+ENV GITHUB_RUN_ID=${GITHUB_RUN_ID}
+
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN addgroup -g 1000 ${PHPGROUP} && adduser -g ${PHPGROUP} -s /bin/sh -D ${PHPUSER}; exit 0
+
+RUN sed -i "s/user = www-data/user = ${PHPUSER}/g" /usr/local/etc/php-fpm.d/www.conf
+RUN sed -i "s/group = www-data/group = ${PHPGROUP}/g" /usr/local/etc/php-fpm.d/www.conf
+
+RUN docker-php-ext-install pdo pdo_mysql
+RUN apk add --update --no-cache bind-tools
+
+RUN mkdir -p /usr/src/php/ext/redis \
+    && curl -L https://github.com/phpredis/phpredis/archive/5.3.4.tar.gz | tar xvz -C /usr/src/php/ext/redis --strip 1 \
+    && echo 'redis' >> /usr/src/php-available-exts \
+    && docker-php-ext-install redis
+
+COPY ./docker/php/start.sh /usr/local/bin/start
+COPY ./src /var/www/html
+
+WORKDIR /var/www/html
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN composer install  \
+    --ignore-platform-reqs \
+    --no-ansi \
+    --no-dev \
+    --no-autoloader \
+    --no-interaction \
+    --no-scripts
+
+RUN composer dump-autoload --optimize --no-dev --no-scripts
+
+CMD ["/usr/local/bin/start"]

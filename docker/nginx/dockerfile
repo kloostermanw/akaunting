@@ -1,0 +1,37 @@
+FROM php:8.1-fpm-alpine AS composer-build
+
+WORKDIR /var/www/html
+COPY src /var/www/html
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN composer install  \
+    --ignore-platform-reqs \
+    --no-ansi \
+    --no-dev \
+    --no-autoloader \
+    --no-interaction \
+    --no-scripts
+
+FROM node:16 AS assets-build
+
+WORKDIR /src
+COPY src /src/
+COPY --from=composer-build /var/www/html/vendor /src/vendor
+RUN npm ci
+RUN npm run build
+
+FROM nginx:stable-alpine
+
+ARG NGINXGROUP
+ARG NGINXUSER
+
+ENV NGINXGROUP=${NGINXGROUP}
+ENV NGINXUSER=${NGINXUSER}
+
+RUN sed -i "s/user www-data/user ${NGINXUSER}/g" /etc/nginx/nginx.conf
+
+ADD ./docker/nginx/default.conf /etc/nginx/conf.d/
+
+RUN mkdir -p /var/www/html/public
+COPY --from=assets-build /src/public /var/www/html/public
+
+RUN addgroup -g 1000 ${NGINXGROUP} && adduser -g ${NGINXGROUP} -s /bin/sh -D ${NGINXUSER}; exit 0
